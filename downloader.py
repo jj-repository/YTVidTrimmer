@@ -12,12 +12,15 @@ class YouTubeDownloader:
     def __init__(self, root):
         self.root = root
         self.root.title("YTVidDownloader")
-        self.root.geometry("600x650")
-        self.root.resizable(False, False)
+        self.root.geometry("600x750")
+        self.root.resizable(True, True)
+        self.root.minsize(600, 650)
 
         self.download_path = str(Path.home() / "Downloads")
         self.current_process = None
         self.is_downloading = False
+        self.video_duration = 0
+        self.is_fetching_duration = False
 
         # Find yt-dlp executable
         self.ytdlp_path = self.find_ytdlp()
@@ -44,7 +47,33 @@ class YouTubeDownloader:
         return "yt-dlp"
 
     def setup_ui(self):
-        main_frame = ttk.Frame(self.root, padding="20")
+        # Configure root grid to expand
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+
+        # Create canvas with scrollbar for scrollable content
+        canvas = tk.Canvas(self.root)
+        scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+
+        # Enable mouse wheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        main_frame = ttk.Frame(scrollable_frame, padding="20")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         ttk.Label(main_frame, text="YouTube URL:", font=('Arial', 12)).grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
@@ -72,10 +101,51 @@ class YouTubeDownloader:
         ttk.Checkbutton(main_frame, text="Extract audio only (M4A format)", variable=self.audio_only_var,
                        command=self.toggle_audio_only).grid(row=12, column=0, sticky=tk.W, padx=(20, 0))
 
-        ttk.Separator(main_frame, orient='horizontal').grid(row=13, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=20)
+        ttk.Separator(main_frame, orient='horizontal').grid(row=13, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
+
+        # Trimming section
+        ttk.Label(main_frame, text="Trim Video:", font=('Arial', 11, 'bold')).grid(row=14, column=0, sticky=tk.W, pady=(0, 3))
+
+        self.trim_enabled_var = tk.BooleanVar()
+        trim_check = ttk.Checkbutton(main_frame, text="Enable video trimming", variable=self.trim_enabled_var,
+                                     command=self.toggle_trim).grid(row=15, column=0, sticky=tk.W, padx=(20, 0))
+
+        self.fetch_duration_btn = ttk.Button(main_frame, text="Fetch Video Duration", command=self.fetch_duration_clicked, state='disabled')
+        self.fetch_duration_btn.grid(row=16, column=0, sticky=tk.W, padx=(20, 0), pady=(3, 5))
+
+        self.duration_label = ttk.Label(main_frame, text="Total Duration: --:--:--", foreground="gray")
+        self.duration_label.grid(row=17, column=0, sticky=tk.W, padx=(20, 0))
+
+        # Start time slider
+        ttk.Label(main_frame, text="Start Time:", font=('Arial', 9)).grid(row=18, column=0, sticky=tk.W, padx=(40, 0), pady=(5, 0))
+
+        self.start_time_var = tk.DoubleVar(value=0)
+        self.start_slider = ttk.Scale(main_frame, from_=0, to=100, variable=self.start_time_var,
+                                      orient='horizontal', length=500, command=self.on_slider_change, state='disabled')
+        self.start_slider.grid(row=19, column=0, sticky=tk.W, padx=(40, 0), pady=(0, 2))
+
+        self.start_time_label = ttk.Label(main_frame, text="00:00:00", foreground="blue", font=('Arial', 9))
+        self.start_time_label.grid(row=20, column=0, sticky=tk.W, padx=(40, 0))
+
+        # End time slider
+        ttk.Label(main_frame, text="End Time:", font=('Arial', 9)).grid(row=21, column=0, sticky=tk.W, padx=(40, 0), pady=(5, 0))
+
+        self.end_time_var = tk.DoubleVar(value=100)
+        self.end_slider = ttk.Scale(main_frame, from_=0, to=100, variable=self.end_time_var,
+                                    orient='horizontal', length=500, command=self.on_slider_change, state='disabled')
+        self.end_slider.grid(row=22, column=0, sticky=tk.W, padx=(40, 0), pady=(0, 2))
+
+        self.end_time_label = ttk.Label(main_frame, text="00:00:00", foreground="blue", font=('Arial', 9))
+        self.end_time_label.grid(row=23, column=0, sticky=tk.W, padx=(40, 0))
+
+        # Trim duration display
+        self.trim_duration_label = ttk.Label(main_frame, text="Selected Duration: 00:00:00", foreground="green", font=('Arial', 9, 'bold'))
+        self.trim_duration_label.grid(row=24, column=0, sticky=tk.W, padx=(40, 0), pady=(3, 0))
+
+        ttk.Separator(main_frame, orient='horizontal').grid(row=25, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
 
         path_frame = ttk.Frame(main_frame)
-        path_frame.grid(row=14, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 20))
+        path_frame.grid(row=26, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
 
         ttk.Label(path_frame, text="Save to:").pack(side=tk.LEFT)
         self.path_label = ttk.Label(path_frame, text=self.download_path, foreground="blue")
@@ -83,7 +153,7 @@ class YouTubeDownloader:
         ttk.Button(path_frame, text="Change", command=self.change_path).pack(side=tk.LEFT)
 
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=15, column=0, columnspan=2, pady=(0, 10))
+        button_frame.grid(row=27, column=0, columnspan=2, pady=(0, 10))
 
         self.download_btn = ttk.Button(button_frame, text="Download", command=self.start_download)
         self.download_btn.pack(side=tk.LEFT, padx=(0, 10))
@@ -92,17 +162,126 @@ class YouTubeDownloader:
         self.stop_btn.pack(side=tk.LEFT)
 
         self.progress = ttk.Progressbar(main_frame, mode='determinate', length=560, maximum=100)
-        self.progress.grid(row=16, column=0, columnspan=2)
+        self.progress.grid(row=28, column=0, columnspan=2)
 
         self.progress_label = ttk.Label(main_frame, text="0%", foreground="blue")
-        self.progress_label.grid(row=17, column=0, columnspan=2, pady=(5, 0))
+        self.progress_label.grid(row=29, column=0, columnspan=2, pady=(5, 0))
 
         self.status_label = ttk.Label(main_frame, text="Ready", foreground="green")
-        self.status_label.grid(row=18, column=0, columnspan=2, pady=(10, 0))
+        self.status_label.grid(row=30, column=0, columnspan=2, pady=(10, 0))
 
     def toggle_audio_only(self):
         if self.audio_only_var.get():
             self.quality_var.set("none")
+
+    def seconds_to_hms(self, seconds):
+        """Convert seconds to HH:MM:SS format"""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+    def toggle_trim(self):
+        """Enable or disable trimming controls"""
+        enabled = self.trim_enabled_var.get()
+        if enabled:
+            self.fetch_duration_btn.config(state='normal')
+            if self.video_duration > 0:
+                self.start_slider.config(state='normal')
+                self.end_slider.config(state='normal')
+        else:
+            self.fetch_duration_btn.config(state='disabled')
+            self.start_slider.config(state='disabled')
+            self.end_slider.config(state='disabled')
+
+    def fetch_duration_clicked(self):
+        """Handler for fetch duration button"""
+        url = self.url_entry.get().strip()
+        if not url:
+            messagebox.showerror("Error", "Please enter a YouTube URL first")
+            return
+
+        if self.is_fetching_duration or self.is_downloading:
+            return
+
+        self.is_fetching_duration = True
+        self.fetch_duration_btn.config(state='disabled')
+        self.update_status("Fetching video duration...", "blue")
+
+        thread = threading.Thread(target=self.fetch_video_duration, args=(url,))
+        thread.daemon = True
+        thread.start()
+
+    def fetch_video_duration(self, url):
+        """Fetch video duration from URL"""
+        try:
+            cmd = [self.ytdlp_path, '--get-duration', url]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
+            if result.returncode == 0:
+                duration_str = result.stdout.strip()
+                # Parse duration (format can be MM:SS or HH:MM:SS)
+                parts = duration_str.split(':')
+                if len(parts) == 2:  # MM:SS
+                    self.video_duration = int(parts[0]) * 60 + int(parts[1])
+                elif len(parts) == 3:  # HH:MM:SS
+                    self.video_duration = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                else:
+                    raise ValueError("Invalid duration format")
+
+                # Update UI
+                self.duration_label.config(
+                    text=f"Total Duration: {self.seconds_to_hms(self.video_duration)}",
+                    foreground="green"
+                )
+
+                # Update sliders
+                self.start_slider.config(from_=0, to=self.video_duration, state='normal')
+                self.end_slider.config(from_=0, to=self.video_duration, state='normal')
+                self.start_time_var.set(0)
+                self.end_time_var.set(self.video_duration)
+
+                # Update labels
+                self.start_time_label.config(text=self.seconds_to_hms(0))
+                self.end_time_label.config(text=self.seconds_to_hms(self.video_duration))
+                self.trim_duration_label.config(text=f"Selected Duration: {self.seconds_to_hms(self.video_duration)}")
+
+                self.update_status("Duration fetched successfully", "green")
+            else:
+                raise Exception("Failed to fetch duration")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to fetch video duration:\n{str(e)}")
+            self.update_status("Failed to fetch duration", "red")
+
+        finally:
+            self.is_fetching_duration = False
+            if self.trim_enabled_var.get():
+                self.fetch_duration_btn.config(state='normal')
+
+    def on_slider_change(self, event=None):
+        """Handle slider changes"""
+        start_time = int(self.start_time_var.get())
+        end_time = int(self.end_time_var.get())
+
+        # Ensure start is before end
+        if start_time >= end_time:
+            if event:  # Only adjust if this was a user interaction
+                # Determine which slider was moved and adjust the other
+                if abs(self.start_slider.get() - start_time) < 0.1:  # Start slider was moved
+                    end_time = min(start_time + 1, self.video_duration)
+                    self.end_time_var.set(end_time)
+                else:  # End slider was moved
+                    start_time = max(end_time - 1, 0)
+                    self.start_time_var.set(start_time)
+
+        # Update labels
+        self.start_time_label.config(text=self.seconds_to_hms(start_time))
+        self.end_time_label.config(text=self.seconds_to_hms(end_time))
+
+        # Update selected duration
+        selected_duration = end_time - start_time
+        self.trim_duration_label.config(text=f"Selected Duration: {self.seconds_to_hms(selected_duration)}")
 
     def change_path(self):
         path = filedialog.askdirectory(initialdir=self.download_path)
@@ -152,8 +331,28 @@ class YouTubeDownloader:
         try:
             audio_only = self.audio_only_var.get()
             quality = self.quality_var.get()
+            trim_enabled = self.trim_enabled_var.get()
 
             self.update_status("Starting download...", "blue")
+
+            # Check if trimming is enabled and validate
+            if trim_enabled:
+                if self.video_duration <= 0:
+                    self.update_status("Please fetch video duration first", "red")
+                    self.download_btn.config(state='normal')
+                    self.stop_btn.config(state='disabled')
+                    self.is_downloading = False
+                    return
+
+                start_time = int(self.start_time_var.get())
+                end_time = int(self.end_time_var.get())
+
+                if start_time >= end_time:
+                    self.update_status("Invalid time range", "red")
+                    self.download_btn.config(state='normal')
+                    self.stop_btn.config(state='disabled')
+                    self.is_downloading = False
+                    return
 
             if audio_only:
                 cmd = [
@@ -165,8 +364,16 @@ class YouTubeDownloader:
                     '--newline',
                     '--progress',
                     '-o', os.path.join(self.download_path, '%(title)s.%(ext)s'),
-                    url
                 ]
+
+                # Add trimming for audio
+                if trim_enabled:
+                    cmd.extend([
+                        '--postprocessor-args',
+                        f'ffmpeg:-ss {start_time} -to {end_time}'
+                    ])
+
+                cmd.append(url)
             else:
                 if quality == "none":
                     self.update_status("Please select a video quality", "red")
@@ -180,12 +387,25 @@ class YouTubeDownloader:
                     self.ytdlp_path,
                     '-f', f'bestvideo[height<={height}]+bestaudio/best[height<={height}]',
                     '--merge-output-format', 'mp4',
+                ]
+
+                # Add trimming parameters
+                if trim_enabled:
+                    # Use download-sections for efficient trimming
+                    start_hms = self.seconds_to_hms(start_time)
+                    end_hms = self.seconds_to_hms(end_time)
+                    cmd.extend([
+                        '--download-sections', f'*{start_hms}-{end_hms}',
+                        '--force-keyframes-at-cuts',
+                    ])
+
+                cmd.extend([
                     '--postprocessor-args', 'ffmpeg:-c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k',
                     '--newline',
                     '--progress',
                     '-o', os.path.join(self.download_path, '%(title)s.%(ext)s'),
                     url
-                ]
+                ])
 
             self.current_process = subprocess.Popen(
                 cmd,

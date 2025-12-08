@@ -1,7 +1,7 @@
-# Video Trimming Feature
+# Video Trimming Feature with Frame Preview
 
 ## Overview
-The YTVidDownloader now supports trimming videos to specific start and end times. You can download only the portion of the video you need instead of the entire video.
+The YTVidDownloader now supports trimming videos to specific start and end times with visual frame previews. You can see exactly what frames will be at your selected start and end points, making it easy to trim videos precisely without guesswork.
 
 ## How to Use
 
@@ -17,12 +17,22 @@ Click the "Fetch Video Duration" button. This will:
 - Display the duration (e.g., "Total Duration: 00:05:30")
 - Enable the start and end time sliders
 
-### Step 4: Adjust Time Range
+### Step 4: Adjust Time Range with Visual Feedback
 Use the two sliders to select your desired video segment:
 - **Start Time slider**: Move to where you want the video to begin
+  - A preview image shows the exact frame at the start time
+  - The preview updates automatically after you stop moving the slider (500ms delay)
 - **End Time slider**: Move to where you want the video to end
+  - A preview image shows the exact frame at the end time
+  - The preview updates in real-time with the slider position
 - Watch the time labels update in real-time (HH:MM:SS format)
 - The "Selected Duration" shows how long your trimmed video will be
+
+**Frame Preview Benefits:**
+- See exactly what content will be included/excluded
+- No guesswork - visual confirmation of your selection
+- Find specific scenes easily by watching the preview update
+- Ensure you're cutting at the right moment
 
 ### Step 5: Download
 - Select your video quality (or audio-only mode)
@@ -32,6 +42,14 @@ Use the two sliders to select your desired video segment:
 The downloaded file will contain ONLY the selected time range.
 
 ## Technical Details
+
+### Frame Preview System
+- **Extraction Method**: Uses yt-dlp to get stream URL, then ffmpeg extracts single frames
+- **Quality**: Previews use lower resolution (480p max) for faster loading
+- **Debouncing**: Updates delayed by 500ms to avoid excessive frame extraction
+- **Caching**: Frames stored in temp directory, cleaned up on app close
+- **Threading**: Frame extraction happens in background to keep UI responsive
+- **Dependencies**: Requires PIL/Pillow for image handling and ffmpeg for frame extraction
 
 ### For Video Downloads
 - Uses `--download-sections *HH:MM:SS-HH:MM:SS` flag

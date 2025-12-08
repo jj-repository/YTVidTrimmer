@@ -7,6 +7,9 @@ import subprocess
 import threading
 import re
 from pathlib import Path
+from PIL import Image, ImageTk
+import tempfile
+import time
 
 class YouTubeDownloader:
     def __init__(self, root):
@@ -22,10 +25,21 @@ class YouTubeDownloader:
         self.video_duration = 0
         self.is_fetching_duration = False
 
+        # Frame preview variables
+        self.start_preview_image = None
+        self.end_preview_image = None
+        self.temp_dir = tempfile.mkdtemp(prefix="ytdl_preview_")
+        self.current_video_url = None
+        self.preview_update_timer = None
+        self.last_preview_update = 0
+
         # Find yt-dlp executable
         self.ytdlp_path = self.find_ytdlp()
 
         self.setup_ui()
+
+        # Bind cleanup on window close
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def find_ytdlp(self):
         """Find yt-dlp in various locations"""
@@ -117,23 +131,39 @@ class YouTubeDownloader:
         self.duration_label.grid(row=17, column=0, sticky=tk.W, padx=(20, 0))
 
         # Start time slider
-        ttk.Label(main_frame, text="Start Time:", font=('Arial', 9)).grid(row=18, column=0, sticky=tk.W, padx=(40, 0), pady=(5, 0))
+        start_frame = ttk.Frame(main_frame)
+        start_frame.grid(row=18, column=0, sticky=tk.W, padx=(40, 0), pady=(5, 0))
+
+        ttk.Label(start_frame, text="Start Time:", font=('Arial', 9)).pack(side=tk.LEFT)
+
+        # Start time preview placeholder
+        self.start_preview_label = tk.Label(start_frame, width=120, height=68, bg='gray20', fg='white',
+                                           text='Preview\nwill appear\nhere', relief='sunken')
+        self.start_preview_label.pack(side=tk.LEFT, padx=(10, 0))
 
         self.start_time_var = tk.DoubleVar(value=0)
         self.start_slider = ttk.Scale(main_frame, from_=0, to=100, variable=self.start_time_var,
                                       orient='horizontal', length=500, command=self.on_slider_change, state='disabled')
-        self.start_slider.grid(row=19, column=0, sticky=tk.W, padx=(40, 0), pady=(0, 2))
+        self.start_slider.grid(row=19, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 2))
 
         self.start_time_label = ttk.Label(main_frame, text="00:00:00", foreground="blue", font=('Arial', 9))
         self.start_time_label.grid(row=20, column=0, sticky=tk.W, padx=(40, 0))
 
         # End time slider
-        ttk.Label(main_frame, text="End Time:", font=('Arial', 9)).grid(row=21, column=0, sticky=tk.W, padx=(40, 0), pady=(5, 0))
+        end_frame = ttk.Frame(main_frame)
+        end_frame.grid(row=21, column=0, sticky=tk.W, padx=(40, 0), pady=(5, 0))
+
+        ttk.Label(end_frame, text="End Time:", font=('Arial', 9)).pack(side=tk.LEFT)
+
+        # End time preview placeholder
+        self.end_preview_label = tk.Label(end_frame, width=120, height=68, bg='gray20', fg='white',
+                                         text='Preview\nwill appear\nhere', relief='sunken')
+        self.end_preview_label.pack(side=tk.LEFT, padx=(10, 0))
 
         self.end_time_var = tk.DoubleVar(value=100)
         self.end_slider = ttk.Scale(main_frame, from_=0, to=100, variable=self.end_time_var,
                                     orient='horizontal', length=500, command=self.on_slider_change, state='disabled')
-        self.end_slider.grid(row=22, column=0, sticky=tk.W, padx=(40, 0), pady=(0, 2))
+        self.end_slider.grid(row=22, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 2))
 
         self.end_time_label = ttk.Label(main_frame, text="00:00:00", foreground="blue", font=('Arial', 9))
         self.end_time_label.grid(row=23, column=0, sticky=tk.W, padx=(40, 0))
@@ -204,6 +234,9 @@ class YouTubeDownloader:
         if self.is_fetching_duration or self.is_downloading:
             return
 
+        # Save the URL for preview extraction
+        self.current_video_url = url
+
         self.is_fetching_duration = True
         self.fetch_duration_btn.config(state='disabled')
         self.update_status("Fetching video duration...", "blue")
@@ -247,6 +280,9 @@ class YouTubeDownloader:
                 self.trim_duration_label.config(text=f"Selected Duration: {self.seconds_to_hms(self.video_duration)}")
 
                 self.update_status("Duration fetched successfully", "green")
+
+                # Trigger initial preview update
+                self.root.after(100, self.update_previews)
             else:
                 raise Exception("Failed to fetch duration")
 
@@ -282,6 +318,139 @@ class YouTubeDownloader:
         # Update selected duration
         selected_duration = end_time - start_time
         self.trim_duration_label.config(text=f"Selected Duration: {self.seconds_to_hms(selected_duration)}")
+
+        # Schedule preview update with debouncing
+        self.schedule_preview_update()
+
+    def schedule_preview_update(self):
+        """Schedule preview update with debouncing to avoid excessive calls"""
+        # Cancel any pending update
+        if self.preview_update_timer:
+            self.root.after_cancel(self.preview_update_timer)
+
+        # Schedule new update after 500ms of no slider movement
+        self.preview_update_timer = self.root.after(500, self.update_previews)
+
+    def extract_frame(self, timestamp):
+        """Extract a single frame at the given timestamp"""
+        if not self.current_video_url:
+            return None
+
+        try:
+            # Create unique temp file for this frame
+            temp_file = os.path.join(self.temp_dir, f"frame_{timestamp}.jpg")
+
+            # Use yt-dlp to download just a small segment and extract frame
+            cmd = [
+                self.ytdlp_path,
+                '-f', 'bestvideo[height<=480]/best[height<=480]',  # Lower quality for preview
+                '--download-sections', f'*{timestamp}-{timestamp+2}',  # Just 2 seconds
+                '--postprocessor-args', f'ffmpeg:-ss 1 -vframes 1 -q:v 2',
+                '--exec', f'ffmpeg -i {{}} -ss 0 -vframes 1 -q:v 2 {temp_file}',
+                '--no-keep-video',
+                self.current_video_url
+            ]
+
+            # Alternative simpler approach using ffmpeg directly via yt-dlp
+            cmd = [
+                'ffmpeg',
+                '-ss', str(timestamp),
+                '-i', self.current_video_url,
+                '-vframes', '1',
+                '-q:v', '2',
+                '-y',
+                temp_file
+            ]
+
+            # Better: use yt-dlp to get stream URL and pipe to ffmpeg
+            # Get the actual video URL
+            get_url_cmd = [
+                self.ytdlp_path,
+                '-f', 'bestvideo[height<=480]/best[height<=480]',
+                '-g',
+                self.current_video_url
+            ]
+
+            result = subprocess.run(get_url_cmd, capture_output=True, text=True, timeout=15)
+            if result.returncode != 0:
+                return None
+
+            video_url = result.stdout.strip().split('\n')[0]
+
+            # Now extract frame from the actual stream
+            cmd = [
+                'ffmpeg',
+                '-ss', str(timestamp),
+                '-i', video_url,
+                '-vframes', '1',
+                '-q:v', '2',
+                '-y',
+                temp_file
+            ]
+
+            subprocess.run(cmd, capture_output=True, timeout=15, check=True)
+
+            if os.path.exists(temp_file):
+                return temp_file
+
+        except Exception as e:
+            print(f"Error extracting frame: {e}")
+
+        return None
+
+    def update_previews(self):
+        """Update both preview images"""
+        if not self.current_video_url or self.video_duration == 0:
+            return
+
+        start_time = int(self.start_time_var.get())
+        end_time = int(self.end_time_var.get())
+
+        # Update in a background thread to avoid blocking UI
+        thread = threading.Thread(target=self._update_previews_thread, args=(start_time, end_time))
+        thread.daemon = True
+        thread.start()
+
+    def _update_previews_thread(self, start_time, end_time):
+        """Background thread to extract and update preview frames"""
+        # Extract start frame
+        start_frame_path = self.extract_frame(start_time)
+        if start_frame_path:
+            self._update_preview_image(start_frame_path, 'start')
+
+        # Extract end frame
+        end_frame_path = self.extract_frame(end_time)
+        if end_frame_path:
+            self._update_preview_image(end_frame_path, 'end')
+
+    def _update_preview_image(self, image_path, position):
+        """Update preview image in UI (must be called from main thread or scheduled)"""
+        try:
+            # Load and resize image
+            img = Image.open(image_path)
+            img.thumbnail((120, 68), Image.Resampling.LANCZOS)
+
+            # Convert to PhotoImage
+            photo = ImageTk.PhotoImage(img)
+
+            # Schedule UI update on main thread
+            if position == 'start':
+                self.root.after(0, lambda: self._set_start_preview(photo))
+            else:
+                self.root.after(0, lambda: self._set_end_preview(photo))
+
+        except Exception as e:
+            print(f"Error updating preview image: {e}")
+
+    def _set_start_preview(self, photo):
+        """Set start preview image (called on main thread)"""
+        self.start_preview_image = photo  # Keep reference to avoid garbage collection
+        self.start_preview_label.config(image=photo, text='')
+
+    def _set_end_preview(self, photo):
+        """Set end preview image (called on main thread)"""
+        self.end_preview_image = photo  # Keep reference to avoid garbage collection
+        self.end_preview_label.config(image=photo, text='')
 
     def change_path(self):
         path = filedialog.askdirectory(initialdir=self.download_path)
@@ -458,6 +627,27 @@ class YouTubeDownloader:
 
     def update_status(self, message, color):
         self.status_label.config(text=message, foreground=color)
+
+    def cleanup_temp_files(self):
+        """Clean up temporary preview files"""
+        try:
+            import shutil
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+        except Exception as e:
+            print(f"Error cleaning up temp files: {e}")
+
+    def on_closing(self):
+        """Handle window close event"""
+        # Stop any ongoing downloads
+        if self.is_downloading and self.current_process:
+            self.current_process.kill()
+
+        # Clean up temp files
+        self.cleanup_temp_files()
+
+        # Close the window
+        self.root.destroy()
 
 def main():
     root = tk.Tk()

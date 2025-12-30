@@ -378,7 +378,7 @@ class YouTubeDownloader:
         """Sanitize filename to prevent path traversal and command injection.
 
         Removes:
-        - Path separators (/, \\)
+        - Path separators (/, \\\\)
         - Parent directory references (..)
         - Shell metacharacters
         - Control characters
@@ -3440,6 +3440,12 @@ class YouTubeDownloader:
     def on_closing(self):
         """Handle window close event with proper resource cleanup"""
         logger.info("Application shutdown initiated...")
+
+        # Save clipboard URLs before shutdown
+        try:
+            self._save_clipboard_urls()
+        except Exception as e:
+            logger.error(f"Error saving clipboard URLs: {e}")
 
         # Stop clipboard monitoring
         self.stop_clipboard_monitoring()

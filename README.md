@@ -1,6 +1,6 @@
-# YTVidDownloader
+# YoutubeDownloader
 
-A professional YouTube video downloader with advanced trimming capabilities and a modern GUI. Download videos in multiple qualities, extract audio, and trim videos to exact timestamps with visual frame previews.
+A professional YouTube video downloader with advanced trimming capabilities, clipboard monitoring, and catbox.moe upload integration. Download videos in multiple qualities, extract audio, trim videos to exact timestamps with visual frame previews, and automatically detect YouTube URLs from your clipboard.
 
 ## ✨ Features
 
@@ -12,6 +12,24 @@ A professional YouTube video downloader with advanced trimming capabilities and 
 - **📊 Real-Time Progress**: Live download progress with speed and ETA
 - **🔄 Smart Caching**: Intelligent frame caching for instant repeated previews
 - **🛑 Stop/Cancel**: Gracefully stop downloads mid-progress
+- **🖱️ Mouse Wheel Scrolling**: Scroll anywhere in the window, not just on scrollbar
+
+### Clipboard Mode (v2.5+)
+- **📋 Auto-Detection**: Automatically detect YouTube URLs copied to clipboard
+- **⚡ Auto-Download**: Optional auto-download for detected URLs
+- **📝 URL Queue**: Scrollable list of detected URLs with individual removal
+- **🔧 Separate Settings**: Independent quality and volume controls
+- **💾 Persistent URLs**: URLs saved between sessions
+- **📂 Custom Output**: Separate download folder for clipboard mode
+- **📈 Progress Tracking**: Individual and total progress for batch downloads
+
+### Uploader Tab (v2.5+)
+- **☁️ Catbox.moe Integration**: Upload downloaded files for easy sharing
+- **📤 Multi-File Upload**: Select and queue multiple files for sequential upload
+- **📜 Upload History**: Track all uploaded files with timestamps and URLs
+- **🔗 Auto-Upload**: Optionally upload files automatically after download (single videos only)
+- **🔍 View History**: Browse previous uploads with "View Upload History" button
+- **🎯 Smart Playlist Handling**: Auto-upload skips playlists to prevent spam
 
 ### Advanced Features (v2.0+)
 - **🔍 URL Validation**: Supports all YouTube URL formats (standard, shorts, youtu.be, embed)
@@ -19,7 +37,7 @@ A professional YouTube video downloader with advanced trimming capabilities and 
 - **🔁 Auto-Retry**: Automatic retry with exponential backoff for network failures
 - **⏱️ Download Timeouts**: Intelligent timeout detection (30 min absolute, 5 min stall)
 - **💾 Resource Management**: Thread pool with controlled concurrency
-- **📋 Comprehensive Logging**: Full debug logs at `~/.ytviddownloader/ytviddownloader.log`
+- **📋 Comprehensive Logging**: Full debug logs at `~/.youtubedownloader/youtubedownloader.log`
 - **🎯 Path Validation**: Ensures download location is writable before starting
 
 ### Performance & Reliability
@@ -44,8 +62,8 @@ Download the pre-built release from the [Releases](../../releases) page and foll
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/YTVidDownloader.git
-   cd YTVidDownloader
+   git clone https://github.com/jj-repository/YoutubeDownloader.git
+   cd YoutubeDownloader
    ```
 
 2. **Install system dependencies:**
@@ -86,7 +104,9 @@ python downloader.py
 
 ### Using the Application
 
-#### Basic Download
+The application has three main tabs: **Main**, **Clipboard Mode**, and **Uploader**.
+
+#### Main Tab: Basic Download
 1. Paste a YouTube URL in the text field
 2. Select your desired quality or choose audio-only
 3. (Optional) Change the download location
@@ -94,7 +114,7 @@ python downloader.py
 5. Watch the real-time progress with speed and ETA
 6. Click **Stop** to cancel if needed
 
-#### Video Trimming
+#### Main Tab: Video Trimming
 1. Paste a YouTube URL
 2. Enable **"Enable video trimming"** checkbox
 3. Click **Fetch Video Duration** to load video info
@@ -102,7 +122,24 @@ python downloader.py
 5. Preview frames update automatically as you adjust times
 6. Click **Download** to save only the selected portion
 
-Downloads are saved to `~/Downloads` by default.
+#### Clipboard Mode Tab
+1. Switch to the **Clipboard Mode** tab
+2. Copy any YouTube URL (Ctrl+C)
+3. The URL is automatically detected and added to the queue
+4. (Optional) Enable **"Auto-download"** to start downloads immediately
+5. Adjust quality and volume settings as needed
+6. Click **Download All** to process the queue
+7. Use **X** buttons to remove individual URLs or **Clear All** to remove all
+
+#### Uploader Tab
+1. Switch to the **Uploader** tab
+2. Click **Add Files** to select video/audio files
+3. Multiple files can be added to the queue
+4. Click **Upload All** to upload files sequentially to catbox.moe
+5. Copy URLs from the results or view upload history
+6. (Optional) Enable **"Auto-upload after download"** in Main tab for automatic uploads
+
+Downloads are saved to `~/Downloads` by default. Clipboard Mode uses `~/Downloads/ClipboardMode`.
 
 ## 🎬 Trimming Feature Details
 
@@ -140,6 +177,9 @@ These settings provide the best balance between file size and quality, keeping d
 - **Python 3.6+**
 - **yt-dlp >= 2024.11.0**: YouTube download engine
 - **Pillow >= 10.0.0**: Image processing for frame previews
+- **catboxpy >= 0.1.0**: File upload to catbox.moe
+- **pyperclip >= 1.8.0**: Clipboard access
+- **dbus-python** (Linux only, optional): KDE Klipper integration
 - **ffmpeg**: Video/audio processing
 - **tkinter**: GUI (usually included with Python)
 
@@ -161,7 +201,7 @@ These settings provide the best balance between file size and quality, keeping d
 **Preview frames not loading**
 - Check internet connection
 - Video may be age-restricted or private
-- Check logs at `~/.ytviddownloader/ytviddownloader.log`
+- Check logs at `~/.youtubedownloader/youtubedownloader.log`
 
 **Download stalling**
 - The app will auto-detect stalls after 5 minutes
@@ -172,14 +212,38 @@ These settings provide the best balance between file size and quality, keeping d
 
 Comprehensive logs are saved to:
 ```
-~/.ytviddownloader/ytviddownloader.log
+~/.youtubedownloader/youtubedownloader.log
 ```
 
 Check this file for detailed error messages and debugging information.
 
 ## 🔄 Changelog
 
-### Version 2.0 (Latest)
+### Version 2.6.0 (Latest)
+- ✅ Quality selector converted to dropdown menu in Trimmer tab (space efficient)
+- ✅ Multi-file upload queue in Uploader tab
+- ✅ Sequential file uploads with progress tracking
+- ✅ Auto-upload prevention for playlists (only single videos)
+- ✅ Mouse wheel scrolling anywhere in the window
+- ✅ Compact clipboard URL list (reduced height)
+- ✅ Compact file queue list (reduced height)
+- ✅ Application renamed to YoutubeDownloader
+- ✅ Fixed clipboard URL persistence on shutdown
+- ✅ Fixed syntax warning in docstring
+
+### Version 2.5.0
+- ✅ **Clipboard Mode Tab**: Auto-detect YouTube URLs from clipboard
+- ✅ Auto-download option for detected URLs
+- ✅ URL queue with individual removal and batch download
+- ✅ Persistent clipboard URLs saved between sessions
+- ✅ Separate settings and download folder for Clipboard Mode
+- ✅ **Uploader Tab**: Catbox.moe file upload integration
+- ✅ Upload history tracking with timestamps
+- ✅ Auto-upload after download feature (optional)
+- ✅ Volume control for audio processing
+- ✅ KDE Klipper clipboard manager support
+
+### Version 2.0
 - ✅ Added video trimming with frame previews
 - ✅ URL validation for all YouTube formats
 - ✅ Auto-retry with exponential backoff
@@ -264,7 +328,7 @@ This project is open source and available under the MIT License.
 
 - **Issues**: [GitHub Issues](../../issues)
 - **Documentation**: See `TRIMMING_FEATURE.md` for detailed trimming guide
-- **Logs**: Check `~/.ytviddownloader/ytviddownloader.log` for debugging
+- **Logs**: Check `~/.youtubedownloader/youtubedownloader.log` for debugging
 
 ---
 

@@ -77,8 +77,8 @@ class YouTubeDownloader:
         self.timeout_monitor_thread = None
 
         # Detect bundled ffmpeg/ffprobe (when packaged with PyInstaller)
-        self.ffmpeg_path = self._get_bundled_executable(self.ffmpeg_path)
-        self.ffprobe_path = self._get_bundled_executable(self.ffprobe_path)
+        self.ffmpeg_path = self._get_bundled_executable('ffmpeg')
+        self.ffprobe_path = self._get_bundled_executable('ffprobe')
 
         # Frame preview variables
         self.start_preview_image = None

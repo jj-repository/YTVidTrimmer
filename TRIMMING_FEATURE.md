@@ -1,7 +1,7 @@
 # Video Trimming Feature with Frame Preview
 
 ## Overview
-The YTVidDownloader now supports trimming videos to specific start and end times with visual frame previews. You can see exactly what frames will be at your selected start and end points, making it easy to trim videos precisely without guesswork.
+The YoutubeDownloader now supports trimming videos to specific start and end times with visual frame previews. You can see exactly what frames will be at your selected start and end points, making it easy to trim videos precisely without guesswork.
 
 ## How to Use
 

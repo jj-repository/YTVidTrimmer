@@ -1,8 +1,8 @@
-# How to Share YTVidDownloader with Your Friend
+# How to Share YoutubeDownloader with Your Friend
 
 ## Quick Answer
 
-Send your friend the file: **`YTVidDownloader-Linux.tar.gz`** (14 MB)
+Send your friend the file: **`YoutubeDownloader-Linux.tar.gz`** (14 MB)
 
 That's it! They just need to extract it and run a simple setup script.
 
@@ -12,8 +12,8 @@ That's it! They just need to extract it and run a simple setup script.
 
 ### Step 1: Extract the Archive
 ```bash
-tar -xzf YTVidDownloader-Linux.tar.gz
-cd YTVidDownloader-Linux/
+tar -xzf YoutubeDownloader-Linux.tar.gz
+cd YoutubeDownloader-Linux/
 ```
 
 Or just right-click the file and select "Extract Here" in your file manager.
@@ -27,10 +27,10 @@ This will check if `ffmpeg` and `yt-dlp` are installed, and show the exact comma
 
 ### Step 3: Run the App
 ```bash
-./YTVidDownloader
+./YoutubeDownloader
 ```
 
-Or just double-click the `YTVidDownloader` file.
+Or just double-click the `YoutubeDownloader` file.
 
 ---
 
@@ -54,21 +54,21 @@ The setup script will detect the Linux distribution and show the exact command t
 For Arch Linux users (like you), your friend would do:
 ```bash
 # Extract
-tar -xzf YTVidDownloader-Linux.tar.gz
-cd YTVidDownloader-Linux/
+tar -xzf YoutubeDownloader-Linux.tar.gz
+cd YoutubeDownloader-Linux/
 
 # Install dependencies
 sudo pacman -S ffmpeg yt-dlp
 
 # Run the app
-./YTVidDownloader
+./YoutubeDownloader
 ```
 
 ---
 
 ## What's Inside the Archive
 
-- **YTVidDownloader** - The main executable (14 MB)
+- **YoutubeDownloader** - The main executable (14 MB)
 - **README.txt** - User documentation
 - **setup.sh** - Dependency checker and installer guide
 
@@ -76,7 +76,7 @@ sudo pacman -S ffmpeg yt-dlp
 
 ## Sharing the File
 
-You can share `YTVidDownloader-Linux.tar.gz` via:
+You can share `YoutubeDownloader-Linux.tar.gz` via:
 - Email attachment
 - File sharing services (Google Drive, Dropbox, WeTransfer, etc.)
 - USB drive

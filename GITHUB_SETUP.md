@@ -5,7 +5,7 @@ Everything is ready! Just follow these simple steps:
 ## Step 1: Create the Repository on GitHub
 
 1. Go to https://github.com/new
-2. Repository name: `YTVidDownloader`
+2. Repository name: `YoutubeDownloader`
 3. Description: `Lightweight YouTube video downloader with GUI and multiple quality options`
 4. Choose: **Public** (or Private if you prefer)
 5. **DO NOT** check "Initialize this repository with a README" (we already have one!)
@@ -16,9 +16,9 @@ Everything is ready! Just follow these simple steps:
 After creating the repo, GitHub will show you some commands. **Ignore those** and use these instead:
 
 ```bash
-cd /mnt/ext4gamedrive/projects/YTVidDownloader
+cd /mnt/ext4gamedrive/projects/YoutubeDownloader
 
-git remote add origin https://github.com/jj-repository/YTVidDownloader.git
+git remote add origin https://github.com/jj-repository/YoutubeDownloader.git
 
 git push -u origin main
 ```
@@ -29,11 +29,11 @@ That's it! Your project will be on GitHub.
 
 To share the compiled executable:
 
-1. Go to your repo: https://github.com/jj-repository/YTVidDownloader
+1. Go to your repo: https://github.com/jj-repository/YoutubeDownloader
 2. Click on "Releases" → "Create a new release"
 3. Tag: `v1.0.0`
-4. Title: `YTVidDownloader v1.0.0`
-5. Upload the file: `YTVidDownloader-Linux.tar.gz` (from your project folder)
+4. Title: `YoutubeDownloader v1.0.0`
+5. Upload the file: `YoutubeDownloader-Linux.tar.gz` (from your project folder)
 6. Click "Publish release"
 
 Now anyone can download the ready-to-use version!
@@ -62,6 +62,6 @@ git push
 
 **Or use SSH instead:**
 ```bash
-git remote set-url origin git@github.com:jj-repository/YTVidDownloader.git
+git remote set-url origin git@github.com:jj-repository/YoutubeDownloader.git
 ```
 (Requires SSH keys set up on GitHub)

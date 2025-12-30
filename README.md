@@ -49,7 +49,7 @@ A professional YouTube video downloader with advanced trimming capabilities, cli
 
 ## 📸 Screenshots
 
-![YTVidDownloader Interface](screenshot.png)
+![YoutubeDownloader Interface](screenshot.png)
 *Modern interface with video trimming and frame preview*
 
 ## 🚀 Installation
@@ -299,7 +299,7 @@ To create a distributable executable:
 ```bash
 source venv/bin/activate
 pip install pyinstaller
-pyinstaller YTVidDownloader.spec
+pyinstaller YoutubeDownloader.spec
 ```
 
 The executable will be in the `dist/` folder.

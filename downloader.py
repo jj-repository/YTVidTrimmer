@@ -30,9 +30,9 @@ except ImportError:
     PYPERCLIP_AVAILABLE = False
 
 # Configure logging
-log_dir = Path.home() / ".ytviddownloader"
+log_dir = Path.home() / ".youtubedownloader"
 log_dir.mkdir(exist_ok=True)
-log_file = log_dir / "ytviddownloader.log"
+log_file = log_dir / "youtubedownloader.log"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,11 +85,11 @@ MAX_FILENAME_LENGTH = 200  # Maximum filename length
 DEFAULT_VIDEO_QUALITY = "480"  # Default video quality preset
 
 # UI Constants
-CLIPBOARD_URL_LIST_HEIGHT = 66  # Height for clipboard URL list (reduced from 200)
+CLIPBOARD_URL_LIST_HEIGHT = 25  # Height for clipboard URL list (reduced from 200)
 
 # File paths for persistence
-UPLOAD_HISTORY_FILE = Path.home() / ".ytviddownloader" / "upload_history.txt"
-CLIPBOARD_URLS_FILE = Path.home() / ".ytviddownloader" / "clipboard_urls.json"
+UPLOAD_HISTORY_FILE = Path.home() / ".youtubedownloader" / "upload_history.txt"
+CLIPBOARD_URLS_FILE = Path.home() / ".youtubedownloader" / "clipboard_urls.json"
 
 # Theme colors
 THEMES = {
@@ -122,9 +122,9 @@ TIME_REGEX = re.compile(r'^(\d{1,2}):(\d{2}):(\d{2})$')
 
 class YouTubeDownloader:
     def __init__(self, root):
-        logger.info("Initializing YTVidDownloader")
+        logger.info("Initializing YoutubeDownloader")
         self.root = root
-        self.root.title("YTVidDownloader")
+        self.root.title("YoutubeDownloader")
         self.root.geometry("900x1140")
         self.root.resizable(True, True)
         self.root.minsize(750, 600)
@@ -207,8 +207,9 @@ class YouTubeDownloader:
         self.auto_upload_var = tk.BooleanVar(value=False)  # Auto-upload after download/trim
 
         # Uploader tab variables
-        self.uploader_file_path = None
+        self.uploader_file_queue = []  # List of file paths to upload
         self.uploader_is_uploading = False
+        self.uploader_current_index = 0
 
         # Load persisted clipboard URLs
         self._load_clipboard_urls()
@@ -290,7 +291,7 @@ class YouTubeDownloader:
         except Exception as e:
             logger.error(f"Error saving upload link: {e}")
 
-    def view_link_history(self):
+    def view_upload_history(self):
         """View upload link history in a new window"""
         history_window = tk.Toplevel(self.root)
         history_window.title("Upload Link History")
@@ -748,34 +749,25 @@ class YouTubeDownloader:
         self.mode_label = ttk.Label(main_tab_frame, text="", foreground="blue", font=('Arial', 9))
         self.mode_label.grid(row=2, column=0, sticky=tk.W, pady=(0, 10))
 
-        # Video Quality section - arranged in rows
-        ttk.Label(main_tab_frame, text="Video Quality:", font=('Arial', 11, 'bold')).grid(row=3, column=0, sticky=tk.W, pady=(10, 5))
+        # Video Quality section - dropdown
+        quality_frame = ttk.Frame(main_tab_frame)
+        quality_frame.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+
+        ttk.Label(quality_frame, text="Video Quality:", font=('Arial', 11, 'bold')).pack(side=tk.LEFT, padx=(0, 10))
 
         self.quality_var = tk.StringVar(value="480")
         self.quality_var.trace_add('write', self.on_quality_change)
 
-        # Quality buttons container
-        quality_frame = ttk.Frame(main_tab_frame)
-        quality_frame.grid(row=4, column=0, columnspan=2, sticky=tk.W, padx=(20, 0), pady=(0, 5))
+        quality_options = ["1440", "1080", "720", "480", "360", "240", "none (Audio only)"]
+        self.quality_combo = ttk.Combobox(quality_frame, textvariable=self.quality_var,
+            values=quality_options, state='readonly', width=20)
+        self.quality_combo.pack(side=tk.LEFT)
 
-        # Row 1: 1440p, 1080p, 720p
-        ttk.Radiobutton(quality_frame, text="1440p (2560x1440)", variable=self.quality_var, value="1440").grid(row=0, column=0, sticky=tk.W, padx=(0, 20))
-        ttk.Radiobutton(quality_frame, text="1080p (1920x1080)", variable=self.quality_var, value="1080").grid(row=0, column=1, sticky=tk.W, padx=(0, 20))
-        ttk.Radiobutton(quality_frame, text="720p (1280x720)", variable=self.quality_var, value="720").grid(row=0, column=2, sticky=tk.W, padx=(0, 20))
-
-        # Row 2: 480p, 360p, 240p
-        ttk.Radiobutton(quality_frame, text="480p (854x480)", variable=self.quality_var, value="480").grid(row=1, column=0, sticky=tk.W, padx=(0, 20), pady=(3, 0))
-        ttk.Radiobutton(quality_frame, text="360p (640x360)", variable=self.quality_var, value="360").grid(row=1, column=1, sticky=tk.W, padx=(0, 20), pady=(3, 0))
-        ttk.Radiobutton(quality_frame, text="240p (426x240)", variable=self.quality_var, value="240").grid(row=1, column=2, sticky=tk.W, padx=(0, 20), pady=(3, 0))
-
-        # Row 3: Audio only
-        ttk.Radiobutton(quality_frame, text="None (Audio only)", variable=self.quality_var, value="none").grid(row=2, column=0, sticky=tk.W, pady=(3, 0))
-
-        ttk.Separator(main_tab_frame, orient='horizontal').grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
+        ttk.Separator(main_tab_frame, orient='horizontal').grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
 
         # Trimming section with Volume Control on the right
         trim_and_volume_row = ttk.Frame(main_tab_frame)
-        trim_and_volume_row.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 3))
+        trim_and_volume_row.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 3))
 
         # Left side: Trim Video
         ttk.Label(trim_and_volume_row, text="Trim Video:", font=('Arial', 11, 'bold')).pack(side=tk.LEFT, padx=(0, 30))
@@ -802,7 +794,7 @@ class YouTubeDownloader:
 
         # Trim checkbox row with fetch button
         trim_checkbox_frame = ttk.Frame(main_tab_frame)
-        trim_checkbox_frame.grid(row=7, column=0, sticky=tk.W, padx=(20, 0), pady=(3, 5))
+        trim_checkbox_frame.grid(row=6, column=0, sticky=tk.W, padx=(20, 0), pady=(3, 5))
 
         self.trim_enabled_var = tk.BooleanVar()
         ttk.Checkbutton(trim_checkbox_frame, text="Enable video trimming", variable=self.trim_enabled_var,
@@ -813,15 +805,15 @@ class YouTubeDownloader:
 
         # Video info label
         self.video_info_label = ttk.Label(main_tab_frame, text="", foreground="blue", wraplength=500, justify=tk.LEFT)
-        self.video_info_label.grid(row=8, column=0, sticky=tk.W, padx=(20, 0), pady=(2, 0))
+        self.video_info_label.grid(row=7, column=0, sticky=tk.W, padx=(20, 0), pady=(2, 0))
 
         # File size estimation label
         self.filesize_label = ttk.Label(main_tab_frame, text="", foreground="green", font=('Arial', 9))
-        self.filesize_label.grid(row=9, column=0, sticky=tk.W, padx=(20, 0), pady=(2, 0))
+        self.filesize_label.grid(row=8, column=0, sticky=tk.W, padx=(20, 0), pady=(2, 0))
 
         # Preview frame to hold both previews side by side
         preview_container = ttk.Frame(main_tab_frame)
-        preview_container.grid(row=10, column=0, sticky=tk.W, padx=(40, 0), pady=(10, 5))
+        preview_container.grid(row=9, column=0, sticky=tk.W, padx=(40, 0), pady=(10, 5))
 
         # Start time preview
         start_preview_frame = ttk.Frame(preview_container)
@@ -847,7 +839,7 @@ class YouTubeDownloader:
 
         # Start time slider and entry
         start_control_frame = ttk.Frame(main_tab_frame)
-        start_control_frame.grid(row=11, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 2))
+        start_control_frame.grid(row=10, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 2))
 
         self.start_time_var = tk.DoubleVar(value=0)
         self.start_slider = ttk.Scale(start_control_frame, from_=0, to=100, variable=self.start_time_var,
@@ -863,7 +855,7 @@ class YouTubeDownloader:
 
         # End time slider and entry
         end_control_frame = ttk.Frame(main_tab_frame)
-        end_control_frame.grid(row=12, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 2))
+        end_control_frame.grid(row=11, column=0, sticky=tk.W, padx=(40, 0), pady=(2, 2))
 
         self.end_time_var = tk.DoubleVar(value=100)
         self.end_slider = ttk.Scale(end_control_frame, from_=0, to=100, variable=self.end_time_var,
@@ -879,12 +871,12 @@ class YouTubeDownloader:
 
         # Trim duration display
         self.trim_duration_label = ttk.Label(main_tab_frame, text="Selected Duration: 00:00:00", foreground="green", font=('Arial', 9, 'bold'))
-        self.trim_duration_label.grid(row=13, column=0, sticky=tk.W, padx=(40, 0), pady=(3, 0))
+        self.trim_duration_label.grid(row=12, column=0, sticky=tk.W, padx=(40, 0), pady=(3, 0))
 
-        ttk.Separator(main_tab_frame, orient='horizontal').grid(row=14, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
+        ttk.Separator(main_tab_frame, orient='horizontal').grid(row=13, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
 
         path_frame = ttk.Frame(main_tab_frame)
-        path_frame.grid(row=15, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        path_frame.grid(row=14, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
 
         ttk.Label(path_frame, text="Save to:").pack(side=tk.LEFT)
         self.path_label = ttk.Label(path_frame, text=self.download_path, foreground="blue")
@@ -894,7 +886,7 @@ class YouTubeDownloader:
 
         # Filename customization
         filename_frame = ttk.Frame(main_tab_frame)
-        filename_frame.grid(row=16, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        filename_frame.grid(row=15, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
 
         ttk.Label(filename_frame, text="Output filename:", font=('Arial', 9)).pack(side=tk.LEFT, padx=(0, 5))
         self.filename_entry = ttk.Entry(filename_frame, width=40)
@@ -902,7 +894,7 @@ class YouTubeDownloader:
         ttk.Label(filename_frame, text="(Optional - leave empty for auto-generated name)", foreground="gray", font=('Arial', 8)).pack(side=tk.LEFT)
 
         button_frame = ttk.Frame(main_tab_frame)
-        button_frame.grid(row=17, column=0, columnspan=2, pady=(0, 10))
+        button_frame.grid(row=16, column=0, columnspan=2, pady=(0, 10))
 
         self.download_btn = ttk.Button(button_frame, text="Download", command=self.start_download)
         self.download_btn.pack(side=tk.LEFT, padx=(0, 10))
@@ -918,40 +910,40 @@ class YouTubeDownloader:
         ttk.Label(button_frame, text="MB/s", font=('Arial', 9)).pack(side=tk.LEFT)
 
         self.progress = ttk.Progressbar(main_tab_frame, mode='determinate', length=560, maximum=100)
-        self.progress.grid(row=18, column=0, columnspan=2)
+        self.progress.grid(row=17, column=0, columnspan=2)
 
         self.progress_label = ttk.Label(main_tab_frame, text="0%", foreground="blue")
-        self.progress_label.grid(row=19, column=0, columnspan=2, pady=(5, 0))
+        self.progress_label.grid(row=18, column=0, columnspan=2, pady=(5, 0))
 
         self.status_label = ttk.Label(main_tab_frame, text="Ready", foreground="green")
-        self.status_label.grid(row=20, column=0, columnspan=2, pady=(10, 0))
+        self.status_label.grid(row=19, column=0, columnspan=2, pady=(10, 0))
 
         # Upload to Catbox.moe Section
-        ttk.Separator(main_tab_frame, orient='horizontal').grid(row=21, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
+        ttk.Separator(main_tab_frame, orient='horizontal').grid(row=20, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=15)
 
-        ttk.Label(main_tab_frame, text="Upload to Streaming Site:", font=('Arial', 11, 'bold')).grid(row=22, column=0, sticky=tk.W, pady=(0, 3))
+        ttk.Label(main_tab_frame, text="Upload to Streaming Site:", font=('Arial', 11, 'bold')).grid(row=21, column=0, sticky=tk.W, pady=(0, 3))
 
         upload_frame = ttk.Frame(main_tab_frame)
-        upload_frame.grid(row=23, column=0, columnspan=2, sticky=tk.W, pady=(5, 5))
+        upload_frame.grid(row=22, column=0, columnspan=2, sticky=tk.W, pady=(5, 5))
 
         self.upload_btn = ttk.Button(upload_frame, text="Upload to Catbox.moe", command=self.start_upload, state='disabled')
         self.upload_btn.pack(side=tk.LEFT, padx=(0, 10))
 
-        ttk.Button(upload_frame, text="View Link History", command=self.view_link_history).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(upload_frame, text="View Upload History", command=self.view_upload_history).pack(side=tk.LEFT, padx=(0, 10))
 
         self.upload_status_label = ttk.Label(upload_frame, text="", foreground="blue", font=('Arial', 9))
         self.upload_status_label.pack(side=tk.LEFT)
 
         # Auto-upload checkbox
         auto_upload_frame = ttk.Frame(main_tab_frame)
-        auto_upload_frame.grid(row=24, column=0, columnspan=2, sticky=tk.W, padx=(20, 0), pady=(5, 0))
+        auto_upload_frame.grid(row=23, column=0, columnspan=2, sticky=tk.W, padx=(20, 0), pady=(5, 0))
 
         ttk.Checkbutton(auto_upload_frame, text="Auto-upload after download/trim completes",
                        variable=self.auto_upload_var).pack(side=tk.LEFT)
 
         # Upload URL display (initially hidden)
         self.upload_url_frame = ttk.Frame(main_tab_frame)
-        self.upload_url_frame.grid(row=25, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
+        self.upload_url_frame.grid(row=24, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
 
         ttk.Label(self.upload_url_frame, text="Upload URL:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT, padx=(0, 5))
 
@@ -1100,19 +1092,38 @@ class YouTubeDownloader:
         # File selection
         ttk.Separator(parent, orient='horizontal').grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
 
-        ttk.Label(parent, text="Select File:", font=('Arial', 11, 'bold')).grid(row=3, column=0, sticky=tk.W, pady=(0, 5))
+        file_header_frame = ttk.Frame(parent)
+        file_header_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
+
+        ttk.Label(file_header_frame, text="File Queue:", font=('Arial', 11, 'bold')).pack(side=tk.LEFT)
+        self.uploader_queue_count_label = ttk.Label(file_header_frame, text="(0 files)", foreground="gray", font=('Arial', 9))
+        self.uploader_queue_count_label.pack(side=tk.LEFT, padx=(10, 0))
 
         file_select_frame = ttk.Frame(parent)
         file_select_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
 
-        self.uploader_file_label = ttk.Label(file_select_frame, text="No file selected", foreground="gray", font=('Arial', 9))
-        self.uploader_file_label.pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(file_select_frame, text="Add Files", command=self.browse_uploader_files).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(file_select_frame, text="Clear All", command=self.clear_uploader_queue).pack(side=tk.LEFT)
 
-        ttk.Button(file_select_frame, text="Browse File", command=self.browse_uploader_file).pack(side=tk.LEFT)
+        # Scrollable file list
+        file_list_container = ttk.Frame(parent)
+        file_list_container.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        parent.grid_rowconfigure(5, weight=1)
 
-        # File info
-        self.uploader_filesize_label = ttk.Label(parent, text="", foreground="blue", font=('Arial', 9))
-        self.uploader_filesize_label.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(0, 10))
+        self.uploader_file_canvas = tk.Canvas(file_list_container, height=150, bg='white',
+                                             highlightthickness=1, highlightbackground='gray')
+        file_scrollbar = ttk.Scrollbar(file_list_container, orient="vertical",
+                                      command=self.uploader_file_canvas.yview)
+        self.uploader_file_list_frame = ttk.Frame(self.uploader_file_canvas)
+
+        self.uploader_file_list_frame.bind("<Configure>",
+            lambda e: self.uploader_file_canvas.configure(scrollregion=self.uploader_file_canvas.bbox("all")))
+
+        self.uploader_file_canvas.create_window((0, 0), window=self.uploader_file_list_frame, anchor="nw")
+        self.uploader_file_canvas.configure(yscrollcommand=file_scrollbar.set)
+
+        self.uploader_file_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        file_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Upload controls
         ttk.Separator(parent, orient='horizontal').grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
@@ -1124,7 +1135,7 @@ class YouTubeDownloader:
                                               command=self.start_uploader_upload, state='disabled')
         self.uploader_upload_btn.pack(side=tk.LEFT, padx=(0, 10))
 
-        ttk.Button(upload_controls_frame, text="View Link History", command=self.view_link_history).pack(side=tk.LEFT)
+        ttk.Button(upload_controls_frame, text="View Upload History", command=self.view_upload_history).pack(side=tk.LEFT)
 
         self.uploader_status_label = ttk.Label(parent, text="", foreground="blue", font=('Arial', 9))
         self.uploader_status_label.grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(5, 10))
@@ -2185,10 +2196,10 @@ class YouTubeDownloader:
 
     # Uploader tab methods
 
-    def browse_uploader_file(self):
-        """Browse and select a file for upload in Uploader tab"""
-        file_path = filedialog.askopenfilename(
-            title="Select Video File",
+    def browse_uploader_files(self):
+        """Browse and select multiple files for upload in Uploader tab"""
+        file_paths = filedialog.askopenfilenames(
+            title="Select Video Files",
             filetypes=[
                 ("Video files", "*.mp4 *.avi *.mkv *.mov *.flv *.wmv *.webm *.m4v"),
                 ("Audio files", "*.mp3 *.m4a *.wav *.flac *.aac *.ogg"),
@@ -2196,102 +2207,172 @@ class YouTubeDownloader:
             ]
         )
 
-        if file_path:
-            self.uploader_file_path = file_path
-            filename = os.path.basename(file_path)
-            self.uploader_file_label.config(text=filename, foreground="black")
+        if file_paths:
+            for file_path in file_paths:
+                # Check file size
+                file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                if file_size_mb > 200:
+                    messagebox.showwarning("File Too Large",
+                                         f"Skipped: {os.path.basename(file_path)}\nFile size ({file_size_mb:.1f} MB) exceeds 200MB limit.")
+                    continue
 
-            # Show file size
-            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            if file_size_mb > 200:
-                self.uploader_filesize_label.config(
-                    text=f"File size: {file_size_mb:.1f} MB (exceeds 200MB limit - cannot upload)",
-                    foreground="red"
-                )
-                self.uploader_upload_btn.config(state='disabled')
-            else:
-                self.uploader_filesize_label.config(
-                    text=f"File size: {file_size_mb:.1f} MB",
-                    foreground="green"
-                )
-                self.uploader_upload_btn.config(state='normal')
+                # Add to queue if not already there
+                if not any(item['path'] == file_path for item in self.uploader_file_queue):
+                    self._add_file_to_uploader_queue(file_path)
+                    logger.info(f"Added file to upload queue: {file_path}")
 
-            logger.info(f"Selected file for upload: {file_path}")
+    def _add_file_to_uploader_queue(self, file_path):
+        """Add a file to the upload queue with UI widget"""
+        file_frame = ttk.Frame(self.uploader_file_list_frame, relief='solid', borderwidth=1)
+        file_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        filename = os.path.basename(file_path)
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+
+        file_label = ttk.Label(file_frame, text=f"{filename} ({file_size_mb:.1f} MB)", font=('Arial', 9))
+        file_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 10))
+
+        remove_btn = ttk.Button(file_frame, text="X", width=3,
+                              command=lambda: self._remove_file_from_queue(file_path))
+        remove_btn.pack(side=tk.RIGHT, padx=5)
+
+        self.uploader_file_queue.append({'path': file_path, 'widget': file_frame})
+        self._update_uploader_queue_count()
+
+        if len(self.uploader_file_queue) > 0 and not self.uploader_is_uploading:
+            self.uploader_upload_btn.config(state='normal')
+
+    def _remove_file_from_queue(self, file_path):
+        """Remove a file from the upload queue"""
+        for i, item in enumerate(self.uploader_file_queue):
+            if item['path'] == file_path:
+                if item['widget']:
+                    item['widget'].destroy()
+                self.uploader_file_queue.pop(i)
+                self._update_uploader_queue_count()
+                if len(self.uploader_file_queue) == 0:
+                    self.uploader_upload_btn.config(state='disabled')
+                logger.info(f"Removed file from queue: {file_path}")
+                break
+
+    def clear_uploader_queue(self):
+        """Clear all files from upload queue"""
+        if self.uploader_is_uploading:
+            messagebox.showwarning("Cannot Clear", "Cannot clear queue while uploads are in progress.")
+            return
+
+        for item in self.uploader_file_queue:
+            if item['widget']:
+                item['widget'].destroy()
+
+        self.uploader_file_queue.clear()
+        self._update_uploader_queue_count()
+        self.uploader_upload_btn.config(state='disabled')
+        logger.info("Cleared all files from upload queue")
+
+    def _update_uploader_queue_count(self):
+        """Update file queue count label"""
+        count = len(self.uploader_file_queue)
+        self.uploader_queue_count_label.config(text=f"({count} file{'s' if count != 1 else ''})")
 
     def start_uploader_upload(self):
-        """Start upload to Catbox.moe in Uploader tab"""
-        if not self.uploader_file_path or not os.path.isfile(self.uploader_file_path):
-            messagebox.showerror("Error", "No file selected. Please browse and select a file first.")
+        """Start uploading all files in queue sequentially"""
+        if len(self.uploader_file_queue) == 0:
+            messagebox.showinfo("No Files", "No files in queue. Please add files first.")
             return
 
-        # Check file size (200MB limit for Catbox.moe)
-        file_size_mb = os.path.getsize(self.uploader_file_path) / (1024 * 1024)
-        if file_size_mb > 200:
-            messagebox.showerror("File Too Large",
-                               f"File size ({file_size_mb:.1f} MB) exceeds Catbox.moe's 200MB limit.")
+        if self.uploader_is_uploading:
             return
 
-        # Disable upload button during upload
+        self.uploader_is_uploading = True
+        self.uploader_current_index = 0
         self.uploader_upload_btn.config(state='disabled')
-        self.uploader_status_label.config(text="Uploading...", foreground="blue")
         self.uploader_url_frame.grid_remove()
 
-        # Start upload in background thread
-        upload_thread = threading.Thread(target=self.uploader_upload_to_catbox, daemon=True)
+        # Start upload queue processing in background thread
+        upload_thread = threading.Thread(target=self._process_uploader_queue, daemon=True)
         upload_thread.start()
 
-    def uploader_upload_to_catbox(self):
-        """Upload file to Catbox.moe from Uploader tab"""
+    def _process_uploader_queue(self):
+        """Process upload queue sequentially"""
+        total_count = len(self.uploader_file_queue)
+
+        for index, item in enumerate(self.uploader_file_queue):
+            if not self.uploader_is_uploading:
+                logger.info("Uploader queue processing stopped by user")
+                break
+
+            file_path = item['path']
+            filename = os.path.basename(file_path)
+
+            self.root.after(0, lambda i=index, t=total_count, fn=filename:
+                self.uploader_status_label.config(
+                    text=f"Uploading {i+1}/{t}: {fn}...",
+                    foreground="blue"))
+
+            success = self._upload_single_file(file_path)
+
+            if not success:
+                # Continue with next file even if one fails
+                continue
+
+        self.root.after(0, self._finish_uploader_queue)
+
+    def _upload_single_file(self, file_path):
+        """Upload a single file from the queue. Returns True if successful."""
         try:
-            self.uploader_is_uploading = True
-            logger.info(f"Starting upload to Catbox.moe from Uploader tab: {self.uploader_file_path}")
+            logger.info(f"Uploading file from queue: {file_path}")
 
             # Upload file using catboxpy
-            file_url = self.catbox_client.upload(self.uploader_file_path)
+            file_url = self.catbox_client.upload(file_path)
 
-            # Update UI on success
-            self.root.after(0, lambda: self._uploader_upload_success(file_url))
+            # Save upload link to history
+            filename = os.path.basename(file_path)
+            self.save_upload_link(file_url, filename)
+
+            # Show latest URL in entry field
+            self.root.after(0, lambda url=file_url: self._show_upload_url(url))
+
             logger.info(f"Upload successful: {file_url}")
+            return True
 
         except Exception as e:
+            logger.exception(f"Upload failed for {file_path}: {e}")
             error_msg = str(e)
-            self.root.after(0, lambda: self._uploader_upload_failed(error_msg))
-            logger.exception(f"Upload failed: {e}")
+            self.root.after(0, lambda msg=error_msg, path=file_path:
+                messagebox.showerror("Upload Failed",
+                    f"Failed to upload {os.path.basename(path)}:\n\n{msg}"))
+            return False
 
-        finally:
-            self.uploader_is_uploading = False
-
-    def _uploader_upload_success(self, file_url):
-        """Handle successful upload from Uploader tab"""
-        self.uploader_status_label.config(text="Upload complete!", foreground="green")
-
-        # Show URL in entry field
+    def _show_upload_url(self, file_url):
+        """Display the most recent upload URL"""
         self.uploader_url_entry.config(state='normal')
         self.uploader_url_entry.delete(0, tk.END)
         self.uploader_url_entry.insert(0, file_url)
         self.uploader_url_entry.config(state='readonly')
         self.uploader_url_frame.grid()
 
-        # Re-enable upload button for re-uploading if needed
-        self.uploader_upload_btn.config(state='normal')
-
-        # Save upload link to history
-        filename = os.path.basename(self.uploader_file_path) if self.uploader_file_path else "unknown"
-        self.save_upload_link(file_url, filename)
-
-        messagebox.showinfo("Upload Complete",
-                          f"File uploaded successfully!\n\nURL: {file_url}\n\n"
-                          "The URL has been copied to your clipboard.")
-
         # Auto-copy to clipboard
         self.root.clipboard_clear()
         self.root.clipboard_append(file_url)
 
-    def _uploader_upload_failed(self, error_msg):
-        """Handle failed upload from Uploader tab"""
-        self.uploader_status_label.config(text="Upload failed", foreground="red")
-        self.uploader_upload_btn.config(state='normal')
-        messagebox.showerror("Upload Failed", f"Failed to upload file:\n\n{error_msg}")
+    def _finish_uploader_queue(self):
+        """Clean up after queue upload completes"""
+        self.uploader_is_uploading = False
+
+        # Clear the queue
+        for item in self.uploader_file_queue:
+            if item['widget']:
+                item['widget'].destroy()
+
+        count = len(self.uploader_file_queue)
+        self.uploader_file_queue.clear()
+        self._update_uploader_queue_count()
+
+        self.uploader_status_label.config(text=f"All uploads complete! ({count} files)", foreground="green")
+        self.uploader_upload_btn.config(state='disabled')
+
+        logger.info(f"Uploader queue finished: {count} files uploaded")
 
     def copy_uploader_url(self):
         """Copy upload URL to clipboard from Uploader tab"""
@@ -2329,10 +2410,14 @@ class YouTubeDownloader:
             self.upload_btn.config(state='normal')
             logger.info(f"Upload enabled for: {filepath}")
 
-            # Auto-upload if enabled
+            # Auto-upload if enabled (but not for playlists)
             if self.auto_upload_var.get():
-                logger.info("Auto-upload enabled, starting upload...")
-                self.root.after(500, self.start_upload)  # Small delay to ensure UI updates
+                url = self.url_entry.get().strip()
+                if url and self.is_playlist_url(url):
+                    logger.info("Auto-upload skipped for playlist URL")
+                else:
+                    logger.info("Auto-upload enabled, starting upload...")
+                    self.root.after(500, self.start_upload)  # Small delay to ensure UI updates
 
     def schedule_preview_update(self):
         """Schedule preview update with debouncing to avoid excessive calls"""

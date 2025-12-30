@@ -13,6 +13,7 @@ A professional YouTube video downloader with advanced trimming capabilities, cli
 - **🔄 Smart Caching**: Intelligent frame caching for instant repeated previews
 - **🛑 Stop/Cancel**: Gracefully stop downloads mid-progress
 - **🖱️ Mouse Wheel Scrolling**: Scroll anywhere in the window, not just on scrollbar
+- **🌍 Multi-Language Support**: Full UI translation in English, German, and Polish with persistent language selection
 
 ### Clipboard Mode (v2.5+)
 - **📋 Auto-Detection**: Automatically detect YouTube URLs copied to clipboard
@@ -112,6 +113,12 @@ python downloader.py
 ### Using the Application
 
 The application has three main tabs: **Main**, **Clipboard Mode**, and **Uploader**.
+
+#### Language Selection
+1. At the top of the window, find the language selector dropdown
+2. Choose from: 🇬🇧 English, 🇩🇪 Deutsch, or 🇵🇱 Polski
+3. Your language preference is saved automatically
+4. Restart the application for the language change to take effect
 
 #### Main Tab: Basic Download
 1. Paste a YouTube URL in the text field
@@ -239,7 +246,15 @@ Check this file for detailed error messages and debugging information.
 
 ## 🔄 Changelog
 
-### Version 2.6.0 (Latest)
+### Version 2.7.0 (Latest)
+- ✅ **Multi-Language Support**: Full UI translation in English (🇬🇧), German (🇩🇪), and Polish (🇵🇱)
+- ✅ Flag-based language selector dropdown at top of window
+- ✅ Persistent language preference saved to config file
+- ✅ ~150 strings translated across all UI elements
+- ✅ Professional-grade translations for German and Polish
+- ✅ Minimal file size impact (~22KB for complete 3-language support)
+
+### Version 2.6.0
 - ✅ Quality selector converted to dropdown menu in Trimmer tab (space efficient)
 - ✅ Multi-file upload queue in Uploader tab
 - ✅ Sequential file uploads with progress tracking

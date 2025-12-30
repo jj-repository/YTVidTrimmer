@@ -728,6 +728,7 @@ class YouTubeDownloader:
         self.preview_lock = threading.Lock()  # Protect preview thread state
         self.clipboard_lock = threading.Lock()  # Protect clipboard URL list
         self.auto_download_lock = threading.Lock()  # Protect auto-download state
+        self.download_lock = threading.Lock()  # Protect download state
 
         # Clipboard Mode variables
         self.clipboard_monitoring = False
@@ -786,8 +787,17 @@ class YouTubeDownloader:
                 with open(CLIPBOARD_URLS_FILE, 'r') as f:
                     import json
                     data = json.load(f)
+
+                    # Validate JSON structure
+                    if not isinstance(data, dict):
+                        raise ValueError("Invalid clipboard URLs file format: expected dict")
+                    if 'urls' not in data:
+                        raise ValueError("Invalid clipboard URLs file format: missing 'urls' key")
+                    if not isinstance(data['urls'], list):
+                        raise ValueError("Invalid clipboard URLs file format: 'urls' must be a list")
+
                     # Store URLs, will be restored to UI after setup_ui() completes
-                    self.persisted_clipboard_urls = data.get('urls', [])
+                    self.persisted_clipboard_urls = data['urls']
                     logger.info(f"Loaded {len(self.persisted_clipboard_urls)} persisted clipboard URLs")
             else:
                 self.persisted_clipboard_urls = []
@@ -1664,7 +1674,7 @@ class YouTubeDownloader:
         url_header_frame.grid(row=9, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
 
         ttk.Label(url_header_frame, text=tr('label_detected_urls'), font=('Arial', 11, 'bold')).pack(side=tk.LEFT)
-        self.clipboard_url_count_label = ttk.Label(url_header_frame, text=tr('label_url_count_0'), foreground="gray", font=('Arial', 9))
+        self.clipboard_url_count_label = ttk.Label(url_header_frame, text=tr('label_url_count', count=0, s='s'), foreground="gray", font=('Arial', 9))
         self.clipboard_url_count_label.pack(side=tk.LEFT, padx=(10, 0))
         ttk.Button(url_header_frame, text=tr('btn_clear_all'), command=self.clear_all_clipboard_urls).pack(side=tk.RIGHT)
 
@@ -1737,7 +1747,7 @@ class YouTubeDownloader:
         file_header_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
 
         ttk.Label(file_header_frame, text=tr('label_file_queue'), font=('Arial', 11, 'bold')).pack(side=tk.LEFT)
-        self.uploader_queue_count_label = ttk.Label(file_header_frame, text=tr('label_file_count_0'), foreground="gray", font=('Arial', 9))
+        self.uploader_queue_count_label = ttk.Label(file_header_frame, text=tr('label_file_count', count=0, s='s'), foreground="gray", font=('Arial', 9))
         self.uploader_queue_count_label.pack(side=tk.LEFT, padx=(10, 0))
 
         file_select_frame = ttk.Frame(parent)
@@ -1881,75 +1891,6 @@ class YouTubeDownloader:
         if self.clipboard_monitoring:
             self.root.after(CLIPBOARD_POLL_INTERVAL_MS, self._poll_clipboard)
 
-    def _get_clipboard_content(self):
-        """Get clipboard content using platform-specific method"""
-        try:
-            # On Linux, try using xclip or xsel for reliable clipboard access without window focus
-            if sys.platform.startswith('linux'):
-                # Ensure DISPLAY is set (required for xclip/xsel to work)
-                env = os.environ.copy()
-                if 'DISPLAY' not in env:
-                    env['DISPLAY'] = ':0'  # Default X display
-
-                try:
-                    # Try CLIPBOARD selection first (Ctrl+C in most apps)
-                    result = subprocess.run(['xclip', '-selection', 'clipboard', '-t', 'UTF8_STRING', '-o'],
-                                          capture_output=True, text=True, timeout=0.5, env=env)
-                    if result.returncode == 0 and result.stdout:
-                        content = result.stdout.strip()
-                        if content:
-                            return content
-
-                    # Try CLIPBOARD without target type
-                    result = subprocess.run(['xclip', '-selection', 'clipboard', '-o'],
-                                          capture_output=True, text=True, timeout=0.5, env=env)
-                    if result.returncode == 0 and result.stdout:
-                        content = result.stdout.strip()
-                        if content:
-                            return content
-
-                    # Try PRIMARY selection (selected text, middle-click paste)
-                    result = subprocess.run(['xclip', '-selection', 'primary', '-o'],
-                                          capture_output=True, text=True, timeout=0.5, env=env)
-                    if result.returncode == 0 and result.stdout:
-                        content = result.stdout.strip()
-                        if content:
-                            return content
-
-                    # All xclip attempts returned empty
-                    return ""
-
-                except FileNotFoundError:
-                    logger.info("xclip not found, falling back to tkinter")
-                except subprocess.TimeoutExpired:
-                    logger.debug("xclip timeout")
-                except subprocess.SubprocessError as e:
-                    logger.debug(f"xclip subprocess error: {e}")
-
-                try:
-                    # Try xsel as fallback
-                    result = subprocess.run(['xsel', '--clipboard', '--output'],
-                                          capture_output=True, text=True, timeout=0.5, env=env)
-                    if result.returncode == 0:
-                        # Success! Use xsel even if clipboard is empty
-                        content = result.stdout.strip()
-                        return content
-                except FileNotFoundError:
-                    logger.debug("xsel not found, falling back to tkinter")
-                except subprocess.SubprocessError as e:
-                    logger.debug(f"xsel subprocess error: {e}")
-
-            # Fallback to tkinter clipboard (works on all platforms when window has focus)
-            try:
-                content = self.root.clipboard_get()
-                logger.debug(f"tkinter read clipboard: {len(content)} chars")
-                return content
-            except tk.TclError:
-                return ""  # Clipboard empty
-
-        except Exception as e:
-            logger.debug(f"Error getting clipboard: {e}")
-            return ""
 
     # Phase 5: URL List Management
 
@@ -3432,9 +3373,10 @@ class YouTubeDownloader:
 
         logger.info(f"Starting download for URL: {url}")
 
-        self.is_downloading = True
-        self.download_start_time = time.time()
-        self.last_progress_time = time.time()
+        with self.download_lock:
+            self.is_downloading = True
+            self.download_start_time = time.time()
+            self.last_progress_time = time.time()
         self.download_btn.config(state='disabled')
         self.stop_btn.config(state='normal')
         self.progress['value'] = 0
@@ -3498,7 +3440,8 @@ class YouTubeDownloader:
         if self.current_process and self.is_downloading:
             self.safe_process_cleanup(self.current_process)
 
-            self.is_downloading = False
+            with self.download_lock:
+                self.is_downloading = False
             self.update_status("Download stopped", "orange")
             self.download_btn.config(state='normal')
             self.stop_btn.config(state='disabled')
@@ -3670,59 +3613,64 @@ class YouTubeDownloader:
             )
 
             # Parse output for progress
-            for line in self.current_process.stdout:
-                if not self.is_downloading:
-                    break
+            try:
+                for line in self.current_process.stdout:
+                    if not self.is_downloading:
+                        break
 
-                # Look for download progress - multiple patterns for reliability
-                if '[download]' in line or 'Downloading' in line:
-                    # Parse progress percentage
-                    progress_match = PROGRESS_REGEX.search(line)
-                    if progress_match:
-                        progress = float(progress_match.group(1))
-                        self.update_progress(progress)
+                    # Look for download progress - multiple patterns for reliability
+                    if '[download]' in line or 'Downloading' in line:
+                        # Parse progress percentage
+                        progress_match = PROGRESS_REGEX.search(line)
+                        if progress_match:
+                            progress = float(progress_match.group(1))
+                            self.update_progress(progress)
 
-                        # Try to extract speed and ETA from the line
-                        status_msg = f"Downloading... {progress:.1f}%"
+                            # Try to extract speed and ETA from the line
+                            status_msg = f"Downloading... {progress:.1f}%"
 
-                        # Look for speed (e.g., "1.23MiB/s" or "500.00KiB/s")
-                        speed_match = SPEED_REGEX.search(line)
-                        if speed_match:
-                            speed = speed_match.group(1)
-                            status_msg += f" at {speed}"
+                            # Look for speed (e.g., "1.23MiB/s" or "500.00KiB/s")
+                            speed_match = SPEED_REGEX.search(line)
+                            if speed_match:
+                                speed = speed_match.group(1)
+                                status_msg += f" at {speed}"
 
-                        # Look for ETA (e.g., "00:05" or "01:23:45")
-                        eta_match = ETA_REGEX.search(line)
-                        if eta_match:
-                            eta = eta_match.group(1)
-                            status_msg += f" | ETA: {eta}"
+                            # Look for ETA (e.g., "00:05" or "01:23:45")
+                            eta_match = ETA_REGEX.search(line)
+                            if eta_match:
+                                eta = eta_match.group(1)
+                                status_msg += f" | ETA: {eta}"
 
-                        self.update_status(status_msg, "blue")
-                        self.last_progress_time = time.time()  # Update progress timestamp
-                    elif 'Destination' in line:
-                        # yt-dlp is starting download
-                        self.update_status("Starting download...", "blue")
+                            self.update_status(status_msg, "blue")
+                            self.last_progress_time = time.time()  # Update progress timestamp
+                        elif 'Destination' in line:
+                            # yt-dlp is starting download
+                            self.update_status("Starting download...", "blue")
+                            self.last_progress_time = time.time()
+
+                    # Look for different download phases
+                    elif '[info]' in line and 'Downloading' in line:
+                        self.update_status("Preparing download...", "blue")
                         self.last_progress_time = time.time()
-
-                # Look for different download phases
-                elif '[info]' in line and 'Downloading' in line:
-                    self.update_status("Preparing download...", "blue")
-                    self.last_progress_time = time.time()
-                elif '[ExtractAudio]' in line:
-                    self.update_status("Extracting audio...", "blue")
-                    self.last_progress_time = time.time()
-                elif '[Merger]' in line or 'Merging' in line:
-                    self.update_status("Merging video and audio...", "blue")
-                    self.last_progress_time = time.time()
-                elif '[ffmpeg]' in line:
-                    self.update_status("Processing with ffmpeg...", "blue")
-                    self.last_progress_time = time.time()
-                elif 'Post-processing' in line or 'Postprocessing' in line:
-                    self.update_status("Post-processing...", "blue")
-                    self.last_progress_time = time.time()
-                elif 'has already been downloaded' in line:
-                    self.update_status("File already exists, skipping...", "orange")
-                    self.last_progress_time = time.time()
+                    elif '[ExtractAudio]' in line:
+                        self.update_status("Extracting audio...", "blue")
+                        self.last_progress_time = time.time()
+                    elif '[Merger]' in line or 'Merging' in line:
+                        self.update_status("Merging video and audio...", "blue")
+                        self.last_progress_time = time.time()
+                    elif '[ffmpeg]' in line:
+                        self.update_status("Processing with ffmpeg...", "blue")
+                        self.last_progress_time = time.time()
+                    elif 'Post-processing' in line or 'Postprocessing' in line:
+                        self.update_status("Post-processing...", "blue")
+                        self.last_progress_time = time.time()
+                    elif 'has already been downloaded' in line:
+                        self.update_status("File already exists, skipping...", "orange")
+                        self.last_progress_time = time.time()
+            except (BrokenPipeError, IOError) as e:
+                if self.is_downloading:
+                    logger.warning(f"Pipe error while reading process output: {e}")
+                    # Process may have terminated, continue to wait()
 
             self.current_process.wait()
 

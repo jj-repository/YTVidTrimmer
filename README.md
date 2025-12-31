@@ -250,7 +250,15 @@ Check this file for detailed error messages and debugging information.
 
 ## 🔄 Changelog
 
-### Version 3.0.0 (Latest) - Production-Ready Release
+### Version 3.1.0 (Latest)
+- ✅ **Speed Limit for Clipboard Mode**: Added download speed cap option (MB/s) matching Trimmer tab
+- ✅ **Improved Preview Extraction**: HTTP reconnect options for reliable YouTube stream fetching
+- ✅ **EOF Preview Fix**: Adjusted end-of-video preview to avoid ffmpeg seek failures
+- ✅ **Fixed Venv Paths**: Resolved broken shebang paths after project rename
+- ✅ **Simplified Clipboard Folder**: Now uses `~/Downloads` instead of `~/Downloads/ClipboardMode`
+- ✅ **Updated Documentation**: READMEs reflect bundled dependencies (no manual install needed)
+
+### Version 3.0.0 - Production-Ready Release
 - ✅ **100% Thread Safety**: All 38 state variables protected with proper locks
 - ✅ **Zero Race Conditions**: Fixed all timing vulnerabilities (TOCTOU issues eliminated)
 - ✅ **Perfect Resource Management**: Fixed subprocess and PIL image handle leaks

@@ -157,7 +157,7 @@ The application has three main tabs: **Main**, **Clipboard Mode**, and **Uploade
 5. Copy URLs from the results or view upload history
 6. (Optional) Enable **"Auto-upload after download"** in Main tab for automatic uploads
 
-Downloads are saved to `~/Downloads` by default. Clipboard Mode uses `~/Downloads/ClipboardMode`.
+Downloads are saved to `~/Downloads` by default.
 
 ## 🎬 Trimming Feature Details
 

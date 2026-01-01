@@ -3598,21 +3598,24 @@ class YouTubeDownloader:
     def check_dependencies(self):
         """Check if yt-dlp, ffmpeg, and ffprobe are available"""
         try:
-            # Check yt-dlp with retry (bundled binaries may need time to extract)
-            version = None
-            for attempt in range(3):
+            # Check yt-dlp - for bundled apps, just verify the binary exists and is executable
+            # Running --version can fail due to PyInstaller environment issues even when it works
+            if os.path.isfile(self.ytdlp_path) and os.access(self.ytdlp_path, os.X_OK):
+                # Try to get version but don't fail if it doesn't work
                 result = subprocess.run([self.ytdlp_path, '--version'],
                                       capture_output=True, timeout=DEPENDENCY_CHECK_TIMEOUT)
-                # Check both stdout and stderr for version (may vary by environment)
-                version = result.stdout.decode().strip() or result.stderr.decode().strip().split('\n')[-1]
-                if version and version[0].isdigit():
-                    break
-                time.sleep(0.5)  # Brief delay before retry
-
-            if version and version[0].isdigit():
-                logger.info(f"yt-dlp version: {version}")
+                version = result.stdout.decode().strip()
+                if version:
+                    logger.info(f"yt-dlp version: {version}")
+                else:
+                    logger.info(f"yt-dlp is available at: {self.ytdlp_path}")
+            elif shutil.which(self.ytdlp_path):
+                # System PATH yt-dlp
+                result = subprocess.run([self.ytdlp_path, '--version'],
+                                      capture_output=True, timeout=DEPENDENCY_CHECK_TIMEOUT)
+                logger.info(f"yt-dlp version: {result.stdout.decode().strip()}")
             else:
-                logger.error(f"yt-dlp check failed: no version output")
+                logger.error(f"yt-dlp not found at: {self.ytdlp_path}")
                 return False
 
             # Check ffmpeg (use bundled or system)

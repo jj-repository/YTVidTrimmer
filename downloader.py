@@ -176,6 +176,7 @@ TRANSLATIONS = {
         'btn_download_all': 'Download All',
         'label_current_download': 'Current Download:',
         'label_completed_total': 'Completed: {done}/{total} videos',
+        'label_full_playlist': 'Full Playlist Download (download all videos when given a playlist link)',
 
         # Uploader tab
         'header_upload_file': 'Upload Local File',
@@ -403,6 +404,7 @@ TRANSLATIONS = {
         'btn_download_all': 'Alle herunterladen',
         'label_current_download': 'Aktueller Download:',
         'label_completed_total': 'Abgeschlossen: {done}/{total} Videos',
+        'label_full_playlist': 'Vollständige Playlist herunterladen (alle Videos bei Playlist-Link)',
 
         # Uploader tab
         'header_upload_file': 'Lokale Datei hochladen',
@@ -630,6 +632,7 @@ TRANSLATIONS = {
         'btn_download_all': 'Pobierz wszystkie',
         'label_current_download': 'Bieżące pobieranie:',
         'label_completed_total': 'Ukończono: {done}/{total} filmów',
+        'label_full_playlist': 'Pełne pobieranie playlisty (pobierz wszystkie filmy z linku playlisty)',
 
         # Uploader tab
         'header_upload_file': 'Prześlij plik lokalny',
@@ -2128,6 +2131,13 @@ class YouTubeDownloader:
         self.clipboard_speed_limit_entry.grid(row=0, column=3, sticky=tk.W)
         ttk.Label(settings_frame, text="MB/s", font=('Arial', 9)).grid(row=0, column=4, sticky=tk.W, padx=(5, 0))
 
+        # Full Playlist Download toggle
+        self.clipboard_full_playlist_var = tk.BooleanVar(value=False)
+        self.clipboard_full_playlist_check = ttk.Checkbutton(
+            settings_frame, text=tr('label_full_playlist'),
+            variable=self.clipboard_full_playlist_var)
+        self.clipboard_full_playlist_check.grid(row=1, column=0, columnspan=5, sticky=tk.W, pady=(5, 0))
+
         # Output Folder
         ttk.Separator(parent, orient='horizontal').grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
 
@@ -2556,7 +2566,7 @@ class YouTubeDownloader:
         self.root.after(0, self._finish_clipboard_downloads)
 
     def _download_clipboard_url(self, url, check_stop=False, check_stop_auto=False):
-        """Download single URL from clipboard mode (blocking, runs in thread). Returns True if successful."""
+        """Download single URL or playlist from clipboard mode (blocking, runs in thread). Returns True if successful."""
         process = None
         try:
             quality = self.clipboard_quality_var.get()
@@ -2564,11 +2574,20 @@ class YouTubeDownloader:
                 quality = "none"
 
             audio_only = quality.startswith("none")
+            is_playlist_url = self.is_playlist_url(url)
+            full_playlist_enabled = self.clipboard_full_playlist_var.get()
+
+            # Determine if we're actually downloading as a playlist
+            download_as_playlist = is_playlist_url and full_playlist_enabled
 
             self.root.after(0, lambda: self.clipboard_progress.config(value=0))
             self.root.after(0, lambda: self.clipboard_progress_label.config(text="0%"))
 
-            output_path = os.path.join(self.clipboard_download_path, '%(title)s.%(ext)s')
+            # Use playlist-appropriate output template only when downloading full playlist
+            if download_as_playlist:
+                output_path = os.path.join(self.clipboard_download_path, '%(playlist_index)s-%(title)s.%(ext)s')
+            else:
+                output_path = os.path.join(self.clipboard_download_path, '%(title)s.%(ext)s')
 
             # Use helper methods for command construction
             if audio_only:
@@ -2576,14 +2595,26 @@ class YouTubeDownloader:
             else:
                 cmd = self.build_video_ytdlp_command(url, output_path, quality, volume=1.0)
 
+            # Add --no-playlist if it's a playlist URL but full playlist download is disabled
+            if is_playlist_url and not full_playlist_enabled:
+                cmd.insert(1, '--no-playlist')
+
             # Add speed limit if set
             cmd.extend(self._get_speed_limit_args(self.clipboard_speed_limit_var))
+
+            if download_as_playlist:
+                logger.info(f"Clipboard full playlist download starting: {url}")
+            elif is_playlist_url:
+                logger.info(f"Clipboard single video from playlist starting: {url}")
+            else:
+                logger.info(f"Clipboard download starting: {url}")
 
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                        universal_newlines=True, bufsize=1)
 
             # Track current download phase for status messages
             current_phase = "video" if not audio_only else "audio"
+            playlist_item_info = ""  # Track which playlist item we're on
 
             for line in process.stdout:
                 # Check stop flags
@@ -2608,16 +2639,23 @@ class YouTubeDownloader:
                 elif 'downloading audio' in line_lower or ('audio' in line_lower and 'downloading' in line_lower):
                     current_phase = "audio"
 
+                # Detect playlist item progress (e.g., "Downloading item 1 of 10")
+                if download_as_playlist and 'downloading item' in line_lower:
+                    item_match = re.search(r'downloading item (\d+) of (\d+)', line_lower)
+                    if item_match:
+                        playlist_item_info = f" [{item_match.group(1)}/{item_match.group(2)}]"
+
                 if '[download]' in line or 'Downloading' in line:
                     progress_match = PROGRESS_REGEX.search(line)
                     if progress_match:
                         progress = float(progress_match.group(1))
                         self.root.after(0, lambda p=progress: self.update_clipboard_progress(p))
 
-                        # Show phase-specific status
+                        # Show phase-specific status with playlist info if applicable
                         phase = current_phase
-                        self.root.after(0, lambda p=progress, ph=phase: self.update_clipboard_status(
-                            f"Downloading {ph}... {p:.1f}%", "blue"))
+                        pinfo = playlist_item_info
+                        self.root.after(0, lambda p=progress, ph=phase, pi=pinfo: self.update_clipboard_status(
+                            f"Downloading {ph}{pi}... {p:.1f}%", "blue"))
 
                 # Show merging/processing status
                 elif '[Merger]' in line or 'Merging' in line:
@@ -4154,9 +4192,9 @@ class YouTubeDownloader:
             if self.is_local_file(url):
                 return self.download_local_file(url)
 
-            # Handle playlist downloads
-            if self.is_playlist:
-                return self.download_playlist(url)
+            # Trimmer mode always downloads single videos, even from playlist URLs
+            # (playlist downloads are only supported in clipboard mode)
+            is_playlist_url = self.is_playlist_url(url)
 
             quality = self.quality_var.get()
             trim_enabled = self.trim_enabled_var.get()
@@ -4235,6 +4273,10 @@ class YouTubeDownloader:
                 # Add speed limit if set
                 cmd.extend(self._get_speed_limit_args())
 
+                # Always use --no-playlist in trimmer mode
+                if is_playlist_url:
+                    cmd.append('--no-playlist')
+
                 cmd.append(url)
             else:
                 if quality.startswith("none"):
@@ -4299,6 +4341,10 @@ class YouTubeDownloader:
 
                 # Add speed limit if set
                 cmd.extend(self._get_speed_limit_args())
+
+                # Always use --no-playlist in trimmer mode
+                if is_playlist_url:
+                    cmd.append('--no-playlist')
 
                 cmd.extend([
                     '--newline',

@@ -2,9 +2,9 @@
 
 ## Quick Answer
 
-Send your friend the file: **`YoutubeDownloader-Linux.tar.gz`** (14 MB)
+Send your friend the file: **`YoutubeDownloader-Linux.tar.gz`** (~35 MB)
 
-That's it! They just need to extract it and run a simple setup script.
+That's it! They just need to extract it and run - **no additional software needed!**
 
 ---
 
@@ -18,49 +18,42 @@ cd YoutubeDownloader-Linux/
 
 Or just right-click the file and select "Extract Here" in your file manager.
 
-### Step 2: Run Setup (checks dependencies)
-```bash
-./setup.sh
-```
-
-This will check if `ffmpeg` and `yt-dlp` are installed, and show the exact command to install them if needed.
-
-### Step 3: Run the App
+### Step 2: Run the App
 ```bash
 ./YoutubeDownloader
 ```
 
 Or just double-click the `YoutubeDownloader` file.
 
+**That's it!** All dependencies (ffmpeg, ffprobe, yt-dlp) are bundled inside the executable.
+
 ---
 
 ## What Your Friend Needs
 
 ### System Requirements:
-- Linux (any distribution)
-- About 20 MB of disk space
+- Linux (any distribution, 64-bit)
+- About 100 MB of disk space
 - Internet connection
 
-### Dependencies (will be installed via setup.sh):
-- **ffmpeg** - for video processing
-- **yt-dlp** - for downloading videos
+### Dependencies:
+**None!** All dependencies are bundled inside the executable:
+- **ffmpeg/ffprobe** - bundled for video/audio processing
+- **yt-dlp** - bundled for downloading videos
+- **Python libraries** - bundled via PyInstaller
 
-The setup script will detect the Linux distribution and show the exact command to install these.
+Your friend doesn't need to install Python, ffmpeg, yt-dlp, or anything else.
 
 ---
 
 ## Quick Start Example
 
-For Arch Linux users (like you), your friend would do:
 ```bash
 # Extract
 tar -xzf YoutubeDownloader-Linux.tar.gz
 cd YoutubeDownloader-Linux/
 
-# Install dependencies
-sudo pacman -S ffmpeg yt-dlp
-
-# Run the app
+# Run the app - that's it!
 ./YoutubeDownloader
 ```
 
@@ -68,21 +61,18 @@ sudo pacman -S ffmpeg yt-dlp
 
 ## What's Inside the Archive
 
-- **YoutubeDownloader** - The main executable (14 MB)
+- **YoutubeDownloader** - The main executable (~35 MB, fully self-contained)
 - **README.txt** - User documentation
-- **setup.sh** - Dependency checker and installer guide
 
 ---
 
 ## Sharing the File
 
 You can share `YoutubeDownloader-Linux.tar.gz` via:
-- Email attachment
+- Email attachment (if your provider allows ~35 MB)
 - File sharing services (Google Drive, Dropbox, WeTransfer, etc.)
 - USB drive
 - Cloud storage
-
-The file is about 14 MB, so it should be easy to share.
 
 ---
 
@@ -92,7 +82,14 @@ The app will:
 - Save downloads to `~/Downloads` by default
 - Let users choose video quality (240p to 1440p)
 - Extract audio-only if needed
+- Trim videos with visual frame previews
 - Show real-time download progress
 - Use space-efficient encoding (H.264/AAC)
 
-Your friend doesn't need to know Python, set up virtual environments, or deal with any technical setup!
+Your friend doesn't need to know Python, set up virtual environments, install ffmpeg, or deal with any technical setup!
+
+---
+
+## For Windows Users
+
+Send them **`YoutubeDownloader-Windows.zip`** instead. Same deal - extract and run `YoutubeDownloader.exe`. All dependencies are bundled.

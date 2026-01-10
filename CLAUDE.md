@@ -130,6 +130,7 @@ MAX_VIDEO_DURATION = 7200     # 2 hours
 **Supported Languages:**
 - English (en) - default
 - German (de)
+- Polish (pl)
 
 **Usage:**
 ```python
@@ -160,6 +161,11 @@ message = tr('download_complete')  # Returns German translation
 1. **No backup before update**: Unlike autoclicker, doesn't create `.backup` file
 2. **Hardcoded supported sites**: URL patterns could be more extensible
 3. **Large single file**: Main downloader.py is large, could benefit from further modularization
+
+## Recent Fixes (January 2026)
+
+- Fixed hardcoded English strings in validate_youtube_url() to use translation system
+- All URL validation messages now use tr() for proper internationalization
 
 ## Language System
 

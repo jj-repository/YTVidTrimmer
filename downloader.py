@@ -732,20 +732,31 @@ class YouTubeDownloader:
         try:
             # Normalize the path
             normalized = os.path.normpath(os.path.abspath(path))
+            normalized_path = Path(normalized)
 
-            # Check for path traversal attempts
-            if '..' in path:
+            # Check for path traversal attempts in both original and normalized path
+            if '..' in path or '..' in normalized:
                 return (False, None, "Path contains directory traversal sequences")
 
             # Ensure the path is within user's home directory or common safe locations
-            home_dir = str(Path.home())
-            safe_prefixes = [
+            home_dir = Path.home()
+            safe_dirs = [
                 home_dir,
-                '/tmp',
-                os.path.expandvars('$TEMP') if sys.platform == 'win32' else '/tmp',
+                Path('/tmp'),
+                Path(os.path.expandvars('$TEMP')) if sys.platform == 'win32' else Path('/tmp'),
             ]
 
-            is_safe = any(normalized.startswith(os.path.normpath(prefix)) for prefix in safe_prefixes)
+            # Use is_relative_to for proper path containment check (not just prefix matching)
+            is_safe = False
+            for safe_dir in safe_dirs:
+                try:
+                    safe_resolved = safe_dir.resolve()
+                    normalized_path.resolve().relative_to(safe_resolved)
+                    is_safe = True
+                    break
+                except ValueError:
+                    continue
+
             if not is_safe:
                 return (False, None, "Download path must be within home directory or temp folder")
 
@@ -970,13 +981,13 @@ class YouTubeDownloader:
             ]
 
             if parsed.netloc not in valid_domains:
-                return False, "Not a YouTube URL. Please enter a valid YouTube link."
+                return False, tr('error_not_youtube_url')
 
             # For youtu.be short links
             if 'youtu.be' in parsed.netloc:
                 if not parsed.path or parsed.path == '/':
-                    return False, "Invalid YouTube short URL"
-                return True, "Valid YouTube URL"
+                    return False, tr('error_invalid_youtube_short')
+                return True, tr('error_valid_youtube_url')
 
             # For youtube.com links
             if 'youtube.com' in parsed.netloc:
@@ -984,29 +995,29 @@ class YouTubeDownloader:
                 if '/watch' in parsed.path:
                     query_params = parse_qs(parsed.query)
                     if 'v' not in query_params:
-                        return False, "Missing video ID in URL"
-                    return True, "Valid YouTube URL"
+                        return False, tr('error_missing_video_id')
+                    return True, tr('error_valid_youtube_url')
 
                 # Check for /shorts/ format
                 elif '/shorts/' in parsed.path:
-                    return True, "Valid YouTube Shorts URL"
+                    return True, tr('error_valid_youtube_shorts')
 
                 # Check for /embed/ format
                 elif '/embed/' in parsed.path:
-                    return True, "Valid YouTube embed URL"
+                    return True, tr('error_valid_youtube_embed')
 
                 # Check for /v/ format (old style)
                 elif '/v/' in parsed.path:
-                    return True, "Valid YouTube URL"
+                    return True, tr('error_valid_youtube_url')
 
                 # Check for playlist
                 elif '/playlist' in parsed.path or 'list=' in parsed.query:
-                    return True, "Valid YouTube Playlist URL"
+                    return True, tr('error_valid_youtube_playlist')
 
                 else:
-                    return False, "Unrecognized YouTube URL format"
+                    return False, tr('error_unrecognized_youtube')
 
-            return False, "Invalid URL format"
+            return False, tr('error_invalid_url_format')
 
         except Exception as e:
             logger.error(f"URL validation error: {e}")
